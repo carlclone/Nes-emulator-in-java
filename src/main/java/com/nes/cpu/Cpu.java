@@ -678,6 +678,36 @@ public class Cpu {
         lookup[0x4C] = new InstructionEntry("JMP", this::JMP, this::ABS, 3);
         lookup[0x6C] = new InstructionEntry("JMP", this::JMP, this::IND, 5);
 
+        // ADC
+        lookup[0x69] = new InstructionEntry("ADC", this::ADC, this::IMM, 2);
+        lookup[0x65] = new InstructionEntry("ADC", this::ADC, this::ZP0, 3);
+        lookup[0x75] = new InstructionEntry("ADC", this::ADC, this::ZPX, 4);
+        lookup[0x6D] = new InstructionEntry("ADC", this::ADC, this::ABS, 4);
+        lookup[0x7D] = new InstructionEntry("ADC", this::ADC, this::ABX, 4);
+        lookup[0x79] = new InstructionEntry("ADC", this::ADC, this::ABY, 4);
+        lookup[0x61] = new InstructionEntry("ADC", this::ADC, this::IZX, 6);
+        lookup[0x71] = new InstructionEntry("ADC", this::ADC, this::IZY, 5);
+
+        // SBC
+        lookup[0xE9] = new InstructionEntry("SBC", this::SBC, this::IMM, 2);
+        lookup[0xE5] = new InstructionEntry("SBC", this::SBC, this::ZP0, 3);
+        lookup[0xF5] = new InstructionEntry("SBC", this::SBC, this::ZPX, 4);
+        lookup[0xED] = new InstructionEntry("SBC", this::SBC, this::ABS, 4);
+        lookup[0xFD] = new InstructionEntry("SBC", this::SBC, this::ABX, 4);
+        lookup[0xF9] = new InstructionEntry("SBC", this::SBC, this::ABY, 4);
+        lookup[0xE1] = new InstructionEntry("SBC", this::SBC, this::IZX, 6);
+        lookup[0xF1] = new InstructionEntry("SBC", this::SBC, this::IZY, 5);
+
+        // Branches
+        lookup[0x90] = new InstructionEntry("BCC", this::BCC, this::REL, 2);
+        lookup[0xB0] = new InstructionEntry("BCS", this::BCS, this::REL, 2);
+        lookup[0xF0] = new InstructionEntry("BEQ", this::BEQ, this::REL, 2);
+        lookup[0xD0] = new InstructionEntry("BNE", this::BNE, this::REL, 2);
+        lookup[0x30] = new InstructionEntry("BMI", this::BMI, this::REL, 2);
+        lookup[0x10] = new InstructionEntry("BPL", this::BPL, this::REL, 2);
+        lookup[0x50] = new InstructionEntry("BVC", this::BVC, this::REL, 2);
+        lookup[0x70] = new InstructionEntry("BVS", this::BVS, this::REL, 2);
+
         // BRK
         lookup[0x00] = new InstructionEntry("BRK", this::BRK, this::IMP, 7);
     }
