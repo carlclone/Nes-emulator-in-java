@@ -379,4 +379,51 @@ public class Cpu {
         pc = popWord();
         pc++;
     }
+
+    // --- Stack Instructions ---
+
+    // Push Accumulator
+    public void PHA(int addr) {
+        push(a);
+    }
+
+    // Push Processor Status
+    public void PHP(int addr) {
+        // Push status with Break (B) and Unused (U) bits set
+        push((byte) (status | B | U));
+    }
+
+    // Pull Accumulator
+    public void PLA(int addr) {
+        a = pop();
+        setZN(a);
+    }
+
+    // Pull Processor Status
+    public void PLP(int addr) {
+        // Pull status, ignore B and U bits (they don't exist in the register)
+        // Actually, U is always 1 in the register effectively, but B is not.
+        // When pulling, we overwrite flags. B flag in register is not affected by PLP?
+        // According to docs: "The B flag is not set or cleared by PLP."
+        // Also U bit is always 1.
+        
+        byte fetched = pop();
+        status = (byte) ((fetched & ~B) | U); // Ensure U is set, B is ignored (or cleared?)
+        // Wait, B flag doesn't exist in the status register physically. It only exists on stack.
+        // So we just load the byte into status, but mask out B bit (keep it 0 or whatever it was?)
+        // Actually, the B bit in the status register is unused/meaningless.
+        // But usually we mask it out to avoid confusion.
+        // Let's stick to: status = (fetched & ~B) | U;
+    }
+
+    // Transfer Stack Pointer to X
+    public void TSX(int addr) {
+        x = sp;
+        setZN(x);
+    }
+
+    // Transfer X to Stack Pointer
+    public void TXS(int addr) {
+        sp = x;
+    }
 }
