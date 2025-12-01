@@ -8,27 +8,25 @@ public class Main {
         
         try {
             // Load Cartridge
-            // For now, use a dummy cartridge or a file if provided
             Cartridge cart;
             if (args.length > 0) {
                 cart = new Cartridge(args[0]);
                 System.out.println("Loaded ROM: " + args[0]);
             } else {
                 System.out.println("No ROM provided. Creating dummy cartridge.");
-                // Create a dummy cartridge with a simple program
-                // 0x8000: A9 55 (LDA #$55)
-                // 0x8002: 8D 00 02 (STA $0200)
-                // 0x8005: 4C 00 80 (JMP $8000)
+                // Create a dummy cartridge
                 byte[] prg = new byte[16384];
-                prg[0] = (byte) 0xA9; prg[1] = (byte) 0x55;
-                prg[2] = (byte) 0x8D; prg[3] = (byte) 0x00; prg[4] = (byte) 0x02;
-                prg[5] = (byte) 0x4C; prg[6] = (byte) 0x00; prg[7] = (byte) 0x80;
+                byte[] chr = new byte[8192];
                 
-                // Reset Vector at 0xFFFC
+                // Fill CHR with a simple pattern for testing
+                for (int i = 0; i < 8192; i++) {
+                    chr[i] = (byte) ((i % 256) ^ 0xAA);
+                }
+                
+                // Reset Vector
                 prg[0x3FFC] = (byte) 0x00;
                 prg[0x3FFD] = (byte) 0x80;
                 
-                byte[] chr = new byte[8192];
                 cart = new Cartridge(prg, chr, 0);
             }
             
@@ -41,18 +39,36 @@ public class Main {
             
             bus.reset();
             
-            // Run for a few cycles to demonstrate
-            System.out.println("Running...");
-            for (int i = 0; i < 100; i++) {
-                bus.clock();
-                // Simple debug output
-                if (cpu.cycles == 0) {
-                    // System.out.println("PC: " + Integer.toHexString(cpu.pc) + " A: " + Integer.toHexString(cpu.a));
+            // Create and show GUI window
+            EmulatorWindow window = new EmulatorWindow(bus);
+            window.start();
+            
+            // Run emulation loop in separate thread
+            Thread emulationThread = new Thread(() -> {
+                System.out.println("Emulation thread started");
+                
+                while (window.isRunning()) {
+                    // Run one frame worth of cycles
+                    // One frame = 262 scanlines * 341 cycles * 3 (CPU runs at 1/3 PPU speed)
+                    // But we call bus.clock() which handles the 3:1 ratio
+                    int frameCycles = 262 * 341;
+                    
+                    for (int i = 0; i < frameCycles; i++) {
+                        bus.clock();
+                    }
+                    
+                    // Sleep to maintain ~60 FPS
+                    try {
+                        Thread.sleep(16); // ~60 FPS
+                    } catch (InterruptedException e) {
+                        break;
+                    }
                 }
-            }
-            System.out.println("Finished 100 cycles.");
-            System.out.println("Final A: " + String.format("%02X", cpu.a));
-            System.out.println("RAM[0x0200]: " + String.format("%02X", bus.read(0x0200)));
+                
+                System.out.println("Emulation thread stopped");
+            });
+            
+            emulationThread.start();
             
         } catch (Exception e) {
             e.printStackTrace();
