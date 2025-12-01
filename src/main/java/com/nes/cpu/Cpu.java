@@ -246,4 +246,43 @@ public class Cpu {
         
         a = (byte) sum;
     }
+
+    // --- Logical Instructions ---
+
+    // Bitwise AND
+    public void AND(int addr) {
+        byte fetched = bus.read(addr);
+        a &= fetched;
+        setZN(a);
+    }
+
+    // Bitwise OR
+    public void ORA(int addr) {
+        byte fetched = bus.read(addr);
+        a |= fetched;
+        setZN(a);
+    }
+
+    // Exclusive OR
+    public void EOR(int addr) {
+        byte fetched = bus.read(addr);
+        a ^= fetched;
+        setZN(a);
+    }
+
+    // Bit Test
+    public void BIT(int addr) {
+        byte fetched = bus.read(addr);
+        int val = fetched & 0xFF;
+        int aVal = a & 0xFF;
+        
+        // Z flag set if (A & M) == 0
+        setFlag(Z, (aVal & val) == 0);
+        
+        // N flag = bit 7 of M
+        setFlag(N, (val & 0x80) != 0);
+        
+        // V flag = bit 6 of M
+        setFlag(V, (val & 0x40) != 0);
+    }
 }
