@@ -26,6 +26,19 @@ public class Ppu {
     private byte[] paletteRam = new byte[32];  // 32 bytes palette memory
     private byte[] oam = new byte[256];        // 256 bytes OAM (sprite memory)
     
+    // Frame buffer (256x240 pixels, RGB format)
+    private int[] frameBuffer = new int[256 * 240];
+    
+    // Background rendering state
+    private int bgNextTileId = 0;
+    private int bgNextTileAttrib = 0;
+    private int bgNextTileLsb = 0;
+    private int bgNextTileMsb = 0;
+    private int bgShifterPatternLo = 0;
+    private int bgShifterPatternHi = 0;
+    private int bgShifterAttribLo = 0;
+    private int bgShifterAttribHi = 0;
+    
     // Timing
     private int scanline = 0;   // Current scanline (0-261)
     private int cycle = 0;      // Current cycle (0-340)
@@ -40,6 +53,18 @@ public class Ppu {
     
     // Reference to bus for NMI triggering
     private Bus bus;
+    
+    // NES Color Palette (64 colors in RGB format)
+    private static final int[] NES_PALETTE = {
+        0x666666, 0x002A88, 0x1412A7, 0x3B00A4, 0x5C007E, 0x6E0040, 0x6C0600, 0x561D00,
+        0x333500, 0x0B4800, 0x005200, 0x004F08, 0x00404D, 0x000000, 0x000000, 0x000000,
+        0xADADAD, 0x155FD9, 0x4240FF, 0x7527FE, 0xA01ACC, 0xB71E7B, 0xB53120, 0x994E00,
+        0x6B6D00, 0x388700, 0x0C9300, 0x008F32, 0x007C8D, 0x000000, 0x000000, 0x000000,
+        0xFFFEFF, 0x64B0FF, 0x9290FF, 0xC676FF, 0xF36AFF, 0xFE6ECC, 0xFE8170, 0xEA9E22,
+        0xBCBE00, 0x88D800, 0x5CE430, 0x45E082, 0x48CDDE, 0x4F4F4F, 0x000000, 0x000000,
+        0xFFFEFF, 0xC0DFFF, 0xD3D2FF, 0xE8C8FF, 0xFBC2FF, 0xFEC4EA, 0xFECCC5, 0xF7D8A5,
+        0xE4E594, 0xCFEF96, 0xBDF4AB, 0xB3F3CC, 0xB5EBF2, 0xB8B8B8, 0x000000, 0x000000
+    };
     
     public void connectCartridge(Cartridge cartridge) {
         this.cartridge = cartridge;
@@ -341,4 +366,72 @@ public class Ppu {
     public int getScanline() { return scanline; }
     public int getCycle() { return cycle; }
     public long getFrame() { return frame; }
+    public int[] getFrameBuffer() { return frameBuffer; }
+    
+    /**
+     * Get color from palette RAM
+     */
+    private int getColorFromPalette(int palette, int pixel) {
+        int paletteIndex = (palette << 2) | pixel;
+        int colorIndex = paletteRam[paletteIndex] & 0x3F;
+        return NES_PALETTE[colorIndex];
+    }
+    
+    /**
+     * Render a single pixel to the frame buffer
+     */
+    private void renderPixel() {
+        int x = cycle - 1;
+        int y = scanline;
+        
+        if (x < 0 || x >= 256 || y < 0 || y >= 240) {
+            return;
+        }
+        
+        // Background pixel
+        int bgPixel = 0;
+        int bgPalette = 0;
+        
+        if ((ppuMask & 0x08) != 0) { // Show background
+            int bitMux = 0x8000 >> fineX;
+            
+            int p0Pixel = (bgShifterPatternLo & bitMux) > 0 ? 1 : 0;
+            int p1Pixel = (bgShifterPatternHi & bitMux) > 0 ? 1 : 0;
+            bgPixel = (p1Pixel << 1) | p0Pixel;
+            
+            int bgPal0 = (bgShifterAttribLo & bitMux) > 0 ? 1 : 0;
+            int bgPal1 = (bgShifterAttribHi & bitMux) > 0 ? 1 : 0;
+            bgPalette = (bgPal1 << 1) | bgPal0;
+        }
+        
+        // Get final color
+        int color = getColorFromPalette(bgPalette, bgPixel);
+        
+        // Draw to frame buffer
+        frameBuffer[y * 256 + x] = color;
+    }
+    
+    /**
+     * Load background shifters
+     */
+    private void loadBackgroundShifters() {
+        bgShifterPatternLo = (bgShifterPatternLo & 0xFF00) | bgNextTileLsb;
+        bgShifterPatternHi = (bgShifterPatternHi & 0xFF00) | bgNextTileMsb;
+        
+        bgShifterAttribLo = (bgShifterAttribLo & 0xFF00) | ((bgNextTileAttrib & 0x01) != 0 ? 0xFF : 0x00);
+        bgShifterAttribHi = (bgShifterAttribHi & 0xFF00) | ((bgNextTileAttrib & 0x02) != 0 ? 0xFF : 0x00);
+    }
+    
+    /**
+     * Update background shifters
+     */
+    private void updateShifters() {
+        if ((ppuMask & 0x08) != 0) { // Show background
+            bgShifterPatternLo <<= 1;
+            bgShifterPatternHi <<= 1;
+            bgShifterAttribLo <<= 1;
+            bgShifterAttribHi <<= 1;
+        }
+    }
 }
+
