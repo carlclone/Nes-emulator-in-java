@@ -550,4 +550,49 @@ public class Cpu {
         a = (byte) (((a & 0xFF) >>> 1) | (c << 7));
         setZN(a);
     }
+
+    // --- System Instructions ---
+
+    public void NOP(int addr) {
+        // No Operation
+    }
+
+    public void BRK(int addr) {
+        // Push PC + 1 (assuming PC is already at next instruction byte)
+        // BRK is a 1-byte instruction, but it's treated as a 2-byte instruction for padding.
+        // The return address pushed is PC + 2.
+        // My fetch() increments PC. So PC is currently at BRK+1.
+        // We need to push PC+1 (which is BRK+2).
+        pushWord(pc + 1);
+        
+        // Push Status with B and U set
+        push((byte) (status | B | U));
+        
+        // Set Interrupt Disable
+        setFlag(I, true);
+        
+        // Load IRQ Vector
+        int lo = bus.read(0xFFFE) & 0xFF;
+        int hi = bus.read(0xFFFF) & 0xFF;
+        pc = (hi << 8) | lo;
+    }
+
+    public void RTI(int addr) {
+        // Pull Status
+        byte fetched = pop();
+        status = (byte) ((fetched & ~B) | U); // Ignore B, set U
+        
+        // Pull PC
+        pc = popWord();
+    }
+
+    // --- Flag Instructions ---
+
+    public void CLC(int addr) { setFlag(C, false); }
+    public void SEC(int addr) { setFlag(C, true); }
+    public void CLI(int addr) { setFlag(I, false); }
+    public void SEI(int addr) { setFlag(I, true); }
+    public void CLV(int addr) { setFlag(V, false); }
+    public void CLD(int addr) { setFlag(D, false); }
+    public void SED(int addr) { setFlag(D, true); }
 }
