@@ -51,9 +51,9 @@ public class InstructionTest {
     @Test
     public void testSTA() {
         cpu.a = 0x42;
-        cpu.STA(0x2000);
+        cpu.STA(0x0200);
         
-        assertEquals(0x42, bus.read(0x2000));
+        assertEquals(0x42, bus.read(0x0200));
     }
     
     @Test
@@ -70,11 +70,11 @@ public class InstructionTest {
     @Test
     public void testSTX_STY() {
         cpu.x = 15;
-        cpu.STX(0x3000);
-        assertEquals(15, bus.read(0x3000));
+        cpu.STX(0x0300);
+        assertEquals(15, bus.read(0x0300));
         
         cpu.y = 25;
-        cpu.STY(0x3001);
-        assertEquals(25, bus.read(0x3001));
+        cpu.STY(0x0301);
+        assertEquals(25, bus.read(0x0301));
     }
 }

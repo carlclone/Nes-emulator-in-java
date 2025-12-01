@@ -8,10 +8,9 @@ public class Bus {
     // 64KB RAM
     private final byte[] ram = new byte[64 * 1024];
 
-    // Connected CPU
-    // private Cpu cpu; // Will be added later when Cpu is ready
-    
     private Cartridge cartridge;
+    private Ppu ppu = new Ppu();
+    private Apu apu = new Apu();
 
     public Bus() {
         // Initialize RAM to 0
@@ -30,12 +29,13 @@ public class Bus {
      * @return The byte at the address.
      */
     public byte read(int addr) {
-        // Cartridge Address Range
+        // Cartridge Address Range (0x4020 - 0xFFFF)
         if (addr >= 0x8000 && addr <= 0xFFFF) {
             if (cartridge != null) {
                 return cartridge.cpuRead(addr);
             }
             // Fallback for testing: read from RAM if no cartridge
+            return ram[addr];
         }
         
         // RAM (0x0000 - 0x1FFF) - Mirrored every 2KB
@@ -43,11 +43,16 @@ public class Bus {
             return ram[addr & 0x07FF];
         }
 
-        // For now, just read from the 64KB RAM array for other areas (like stack 0x0100)
-        // This is a temporary fallback until full memory map is implemented
-        if (addr >= 0 && addr < ram.length) {
-            return ram[addr];
+        // PPU Registers (0x2000 - 0x3FFF) - Mirrored every 8 bytes
+        if (addr >= 0x2000 && addr <= 0x3FFF) {
+            return ppu.cpuRead(addr & 0x2007);
         }
+        
+        // APU Registers (0x4000 - 0x4017)
+        if (addr >= 0x4000 && addr <= 0x4017) {
+            return apu.cpuRead(addr);
+        }
+
         return 0x00;
     }
 
@@ -64,6 +69,8 @@ public class Bus {
                 return;
             }
             // Fallback for testing: write to RAM if no cartridge
+            ram[addr] = data;
+            return;
         }
         
         // RAM (0x0000 - 0x1FFF) - Mirrored every 2KB
@@ -71,10 +78,17 @@ public class Bus {
             ram[addr & 0x07FF] = data;
             return;
         }
-
-        // Temporary fallback
-        if (addr >= 0 && addr < ram.length) {
-            ram[addr] = data;
+        
+        // PPU Registers (0x2000 - 0x3FFF) - Mirrored every 8 bytes
+        if (addr >= 0x2000 && addr <= 0x3FFF) {
+            ppu.cpuWrite(addr & 0x2007, data);
+            return;
+        }
+        
+        // APU Registers (0x4000 - 0x4017)
+        if (addr >= 0x4000 && addr <= 0x4017) {
+            apu.cpuWrite(addr, data);
+            return;
         }
     }
 }
