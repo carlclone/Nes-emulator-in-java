@@ -206,4 +206,44 @@ public class Cpu {
     public void STY(int addr) {
         bus.write(addr, y);
     }
+
+    // Add with Carry
+    public void ADC(int addr) {
+        byte fetched = bus.read(addr);
+        int val = fetched & 0xFF;
+        int aVal = a & 0xFF;
+        int cVal = getFlag(C);
+        
+        int sum = aVal + val + cVal;
+        
+        setFlag(C, sum > 255);
+        setFlag(Z, (sum & 0xFF) == 0);
+        setFlag(N, (sum & 0x80) != 0);
+        
+        // Overflow: ~(A ^ M) & (A ^ R) & 0x80
+        boolean overflow = (~(aVal ^ val) & (aVal ^ sum) & 0x80) != 0;
+        setFlag(V, overflow);
+        
+        a = (byte) sum;
+    }
+
+    // Subtract with Carry
+    public void SBC(int addr) {
+        byte fetched = bus.read(addr);
+        int val = (fetched ^ 0xFF) & 0xFF; // Invert bits
+        int aVal = a & 0xFF;
+        int cVal = getFlag(C);
+        
+        int sum = aVal + val + cVal;
+        
+        setFlag(C, sum > 255);
+        setFlag(Z, (sum & 0xFF) == 0);
+        setFlag(N, (sum & 0x80) != 0);
+        
+        // Overflow logic is same as ADC but with inverted M
+        boolean overflow = (~(aVal ^ val) & (aVal ^ sum) & 0x80) != 0;
+        setFlag(V, overflow);
+        
+        a = (byte) sum;
+    }
 }
