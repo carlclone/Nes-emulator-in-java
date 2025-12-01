@@ -426,4 +426,62 @@ public class Cpu {
     public void TXS(int addr) {
         sp = x;
     }
+
+    // --- Register Transfers ---
+
+    public void TAX(int addr) {
+        x = a;
+        setZN(x);
+    }
+
+    public void TAY(int addr) {
+        y = a;
+        setZN(y);
+    }
+
+    public void TXA(int addr) {
+        a = x;
+        setZN(a);
+    }
+
+    public void TYA(int addr) {
+        a = y;
+        setZN(a);
+    }
+
+    // --- Increment / Decrement ---
+
+    public void INC(int addr) {
+        byte val = bus.read(addr);
+        val++;
+        bus.write(addr, val);
+        setZN(val);
+    }
+
+    public void DEC(int addr) {
+        byte val = bus.read(addr);
+        val--;
+        bus.write(addr, val);
+        setZN(val);
+    }
+
+    public void INX(int addr) {
+        x++;
+        setZN(x);
+    }
+
+    public void DEX(int addr) {
+        x--;
+        setZN(x);
+    }
+
+    public void INY(int addr) {
+        y++;
+        setZN(y);
+    }
+
+    public void DEY(int addr) {
+        y--;
+        setZN(y);
+    }
 }
