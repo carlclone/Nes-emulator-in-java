@@ -316,41 +316,87 @@ public class Ppu {
         }
     }
     
+    private void fetchNametableByte() {
+        int addr = 0x2000 | (vramAddr & 0x0FFF);
+        bgNextTileId = ppuRead(addr) & 0xFF;
+    }
+    
+    private void fetchAttributeByte() {
+        int addr = 0x23C0 | (vramAddr & 0x0C00) | ((vramAddr >> 4) & 0x38) | ((vramAddr >> 2) & 0x07);
+        bgNextTileAttrib = ppuRead(addr) & 0xFF;
+        if ((vramAddr & 0x0040) != 0) bgNextTileAttrib >>= 4;
+        if ((vramAddr & 0x0002) != 0) bgNextTileAttrib >>= 2;
+        bgNextTileAttrib &= 0x03;
+    }
+    
+    private void fetchPatternLow() {
+        int fineY = (vramAddr >> 12) & 0x07;
+        int table = (ppuCtrl & 0x10) != 0 ? 0x1000 : 0x0000;
+        int addr = table + (bgNextTileId << 4) + fineY;
+        bgNextTileLsb = ppuRead(addr) & 0xFF;
+    }
+    
+    private void fetchPatternHigh() {
+        int fineY = (vramAddr >> 12) & 0x07;
+        int table = (ppuCtrl & 0x10) != 0 ? 0x1000 : 0x0000;
+        int addr = table + (bgNextTileId << 4) + fineY + 8;
+        bgNextTileMsb = ppuRead(addr) & 0xFF;
+    }
+    
+    private void incrementScrollX() {
+        if ((ppuMask & 0x18) == 0) return;
+        if ((vramAddr & 0x001F) == 31) {
+            vramAddr &= ~0x001F;
+            vramAddr ^= 0x0400;
+        } else {
+            vramAddr++;
+        }
+    }
+    
+    private void incrementScrollY() {
+        if ((ppuMask & 0x18) == 0) return;
+        if ((vramAddr & 0x7000) != 0x7000) {
+            vramAddr += 0x1000;
+        } else {
+            vramAddr &= ~0x7000;
+            int y = (vramAddr & 0x03E0) >> 5;
+            if (y == 29) {
+                y = 0;
+                vramAddr ^= 0x0800;
+            } else if (y == 31) {
+                y = 0;
+            } else {
+                y++;
+            }
+            vramAddr = (vramAddr & ~0x03E0) | (y << 5);
+        }
+    }
+    
     /**
      * Advance PPU by one cycle
      */
     public void clock() {
-        // Visible scanlines (0-239) and pre-render scanline (261)
         if (scanline < 240 || scanline == 261) {
-            // TODO: Rendering logic will go here
-        }
-        
-        // Post-render scanline (240) - idle
-        
-        // VBlank scanlines (241-260)
-        if (scanline == 241 && cycle == 1) {
-            // Set VBlank flag
-            ppuStatus |= 0x80;
-            nmiOccurred = true;
-            
-            // Trigger NMI if enabled
-            if (nmiOutput && bus != null) {
-                bus.nmi();
+            if ((cycle >= 1 && cycle <= 256) || (cycle >= 321 && cycle <= 336)) {
+                updateShifters();
+                switch ((cycle - 1) % 8) {
+                    case 0: loadBackgroundShifters(); fetchNametableByte(); break;
+                    case 2: fetchAttributeByte(); break;
+                    case 4: fetchPatternLow(); break;
+                    case 6: fetchPatternHigh(); break;
+                    case 7: incrementScrollX(); break;
+                }
             }
+            if (cycle == 256) incrementScrollY();
+            if (cycle == 257 && (ppuMask & 0x18) != 0) vramAddr = (vramAddr & 0xFBE0) | (tempVramAddr & 0x041F);
+            if (scanline == 261 && cycle >= 280 && cycle <= 304 && (ppuMask & 0x18) != 0) vramAddr = (vramAddr & 0x841F) | (tempVramAddr & 0x7BE0);
+            if (scanline < 240 && cycle >= 1 && cycle <= 256) renderPixel();
         }
-        
-        // End of VBlank
-        if (scanline == 261 && cycle == 1) {
-            // Clear VBlank flag
-            ppuStatus &= ~0x80;
-            nmiOccurred = false;
-            
-            // Clear sprite 0 hit and sprite overflow
-            ppuStatus &= ~0x40;
-            ppuStatus &= ~0x20;
+        if (scanline == 241 && cycle == 1) {
+            ppuStatus |= 0x80;
+            if (nmiOutput && bus != null) bus.nmi();
         }
-        
-        // Advance cycle and scanline
+        if (scanline == 261 && cycle == 1) ppuStatus &= ~0xE0;
         cycle++;
         if (cycle >= 341) {
             cycle = 0;
