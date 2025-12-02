@@ -57,6 +57,13 @@ public class Main {
                         bus.clock();
                     }
                     
+                    // Debug Output every 60 frames
+                    if (bus.getPpu().getFrame() % 60 == 0) {
+                        Ppu ppu = bus.getPpu();
+                        System.out.println(String.format("Frame: %d, PPU CTRL: %02X, MASK: %02X, STATUS: %02X",
+                            ppu.getFrame(), ppu.getPpuCtrl(), ppu.getPpuMask(), ppu.getPpuStatus()));
+                    }
+
                     // Sleep to maintain ~60 FPS
                     try {
                         Thread.sleep(16); // ~60 FPS
