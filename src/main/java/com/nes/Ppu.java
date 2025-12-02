@@ -39,6 +39,22 @@ public class Ppu {
     private int bgShifterAttribLo = 0;
     private int bgShifterAttribHi = 0;
     
+    // Sprite rendering state
+    private byte[] secondaryOam = new byte[32]; // 8 sprites * 4 bytes
+    private int spriteCount = 0; // Number of sprites found for next scanline
+    
+    // Sprite shift registers (8 sprites)
+    private int[] spriteShifterPatternLo = new int[8];
+    private int[] spriteShifterPatternHi = new int[8];
+    
+    // Sprite counters and latches
+    private int[] spriteX = new int[8];      // X position counters
+    private int[] spriteAttribute = new int[8]; // Attribute latches
+    
+    // Sprite 0 hit detection
+    private boolean bSpriteZeroHitPossible = false;
+    private boolean bSpriteZeroBeingRendered = false;
+    
     // Timing
     private int scanline = 0;   // Current scanline (0-261)
     private int cycle = 0;      // Current cycle (0-340)
@@ -95,6 +111,24 @@ public class Ppu {
         
         nmiOccurred = false;
         nmiOutput = false;
+        
+        // Initialize palette RAM with default colors to avoid grey screen
+        // Background palette 0
+        paletteRam[0] = 0x0F;  // Black background
+        paletteRam[1] = 0x00;  // Dark grey
+        paletteRam[2] = 0x10;  // Light grey  
+        paletteRam[3] = 0x30;  // White
+        
+        // Reset sprite state
+        spriteCount = 0;
+        bSpriteZeroHitPossible = false;
+        bSpriteZeroBeingRendered = false;
+        for (int i = 0; i < 8; i++) {
+            spriteShifterPatternLo[i] = 0;
+            spriteShifterPatternHi[i] = 0;
+            spriteX[i] = 0;
+            spriteAttribute[i] = 0;
+        }
     }
     
     /**
@@ -373,6 +407,229 @@ public class Ppu {
     }
     
     /**
+     * Evaluate sprites for the next scanline (Cycles 257-320)
+     */
+    private void evaluateSprites() {
+        // Clear sprite count for next scanline
+        spriteCount = 0;
+        
+        // Clear secondary OAM (conceptually)
+        for (int i = 0; i < 32; i++) {
+            secondaryOam[i] = (byte) 0xFF;
+        }
+        
+        // Sprite evaluation for next scanline
+        int oamEntry = 0;
+        while (oamEntry < 64 && spriteCount < 8) {
+            int diff = scanline - (oam[oamEntry * 4] & 0xFF);
+            
+            // Check if sprite is visible on this scanline
+            // Standard sprites are 8x8, so diff should be >= 0 and < 8
+            // TODO: Add 8x16 support later
+            int spriteHeight = (ppuCtrl & 0x20) != 0 ? 16 : 8;
+            
+            if (diff >= 0 && diff < spriteHeight) {
+                // Sprite is visible, copy to secondary OAM
+                if (spriteCount < 8) {
+                    // Copy 4 bytes: Y, Tile ID, Attribute, X
+                    secondaryOam[spriteCount * 4 + 0] = oam[oamEntry * 4 + 0];
+                    secondaryOam[spriteCount * 4 + 1] = oam[oamEntry * 4 + 1];
+                    secondaryOam[spriteCount * 4 + 2] = oam[oamEntry * 4 + 2];
+                    secondaryOam[spriteCount * 4 + 3] = oam[oamEntry * 4 + 3];
+                    spriteCount++;
+                }
+            }
+            oamEntry++;
+        }
+        
+        // Sprite overflow flag logic would go here (if > 8 sprites found)
+        if (spriteCount == 8) {
+            ppuStatus |= 0x20;
+        }
+    }
+    
+    /**
+     * Fetch sprite patterns for the next scanline (Cycles 321-340 or end of scanline)
+     */
+    private void fetchSpritePatterns() {
+        // For each visible sprite, fetch its pattern data
+        for (int i = 0; i < spriteCount; i++) {
+            int spriteY = (secondaryOam[i * 4 + 0] & 0xFF);
+            int spriteTileId = (secondaryOam[i * 4 + 1] & 0xFF);
+            int spriteAttrib = (secondaryOam[i * 4 + 2] & 0xFF);
+            int spriteXPos = (secondaryOam[i * 4 + 3] & 0xFF);
+            
+            // Determine address of sprite pattern
+            int addr = 0;
+            int spriteHeight = (ppuCtrl & 0x20) != 0 ? 16 : 8;
+            boolean flipV = (spriteAttrib & 0x80) != 0;
+            
+            int row = scanline - spriteY;
+            if (flipV) {
+                row = (spriteHeight - 1) - row;
+            }
+            
+            // 8x8 Sprites
+            if (spriteHeight == 8) {
+                int table = (ppuCtrl & 0x08) != 0 ? 0x1000 : 0x0000;
+                addr = table + (spriteTileId << 4) + row;
+            }
+            // 8x16 Sprites
+            else {
+                int table = (spriteTileId & 0x01) != 0 ? 0x1000 : 0x0000;
+                spriteTileId &= 0xFE;
+                if (row < 8) {
+                    addr = table + (spriteTileId << 4) + row;
+                } else {
+                    addr = table + ((spriteTileId + 1) << 4) + (row - 8);
+                }
+            }
+            
+            // Fetch Low and High pattern bytes
+            int patternLo = ppuRead(addr);
+            int patternHi = ppuRead(addr + 8);
+            
+            // Flip Horizontally if needed
+            if ((spriteAttrib & 0x40) != 0) {
+                patternLo = flipByte(patternLo);
+                patternHi = flipByte(patternHi);
+            }
+            
+            // Load into shifters
+            spriteShifterPatternLo[i] = patternLo;
+            spriteShifterPatternHi[i] = patternHi;
+            spriteX[i] = spriteXPos;
+            spriteAttribute[i] = spriteAttrib;
+        }
+    }
+    
+    // Helper to flip a byte horizontally
+    private int flipByte(int b) {
+        b = (b & 0xF0) >> 4 | (b & 0x0F) << 4;
+        b = (b & 0xCC) >> 2 | (b & 0x33) << 2;
+        b = (b & 0xAA) >> 1 | (b & 0x55) << 1;
+        return b & 0xFF;
+    }
+    
+    /**
+     * Render a single pixel at the current cycle
+     */
+    private void renderPixel() {
+        int bgPixel = 0;
+        int bgPalette = 0;
+        
+        // 1. Background Pixel
+        if ((ppuMask & 0x08) != 0) {
+            int bitMux = 0x8000 >> fineX;
+            
+            int p0 = (bgShifterPatternLo & bitMux) != 0 ? 1 : 0;
+            int p1 = (bgShifterPatternHi & bitMux) != 0 ? 2 : 0;
+            bgPixel = p1 | p0;
+            
+            int pal0 = (bgShifterAttribLo & bitMux) != 0 ? 1 : 0;
+            int pal1 = (bgShifterAttribHi & bitMux) != 0 ? 2 : 0;
+            bgPalette = pal1 | pal0;
+        }
+        
+        // 2. Sprite Pixel
+        int spritePixel = 0;
+        int spritePalette = 0;
+        boolean spritePriority = false; // True = behind background
+        boolean spriteZeroBeingRendered = false;
+        
+        if ((ppuMask & 0x10) != 0) {
+            // Iterate through all 8 possible sprites
+            for (int i = 0; i < spriteCount; i++) {
+                // Check if sprite is at current X position
+                if (spriteX[i] == 0) {
+                    // This logic was flawed in previous attempt.
+                    // We need to check if the current cycle is within the sprite's X range.
+                }
+            }
+            
+            // Revised Sprite Logic:
+            // Iterate all sprites. If (cycle - 1) is within [spriteX, spriteX + 7]
+            // Then this sprite contributes to the pixel.
+            // First non-transparent sprite wins.
+            for (int i = 0; i < spriteCount; i++) {
+                int offset = (cycle - 1) - spriteX[i];
+                if (offset >= 0 && offset < 8) {
+                    // Pixel is inside sprite
+                    // Get bit from shifter (MSB first usually, but we flipped if needed)
+                    // Since we flipped, we can just take bit (7 - offset)
+                    int bit = 0x80 >> offset;
+                    int p0 = (spriteShifterPatternLo[i] & bit) != 0 ? 1 : 0;
+                    int p1 = (spriteShifterPatternHi[i] & bit) != 0 ? 2 : 0;
+                    int pixel = p1 | p0;
+                    
+                    if (pixel != 0) {
+                        // Found a non-transparent sprite pixel
+                        if (spritePixel == 0) { // Only take the first one (highest priority)
+                            spritePixel = pixel;
+                            spritePalette = (spriteAttribute[i] & 0x03) + 4; // Sprites use palette 4-7
+                            spritePriority = (spriteAttribute[i] & 0x20) != 0;
+                            
+                            if (i == 0) {
+                                spriteZeroBeingRendered = true;
+                            }
+                        }
+                        break; // Stop checking other sprites
+                    }
+                }
+            }
+        }
+        
+        // 3. Priority Multiplexer
+        int finalPixel = 0;
+        int finalPalette = 0;
+        
+        if (bgPixel == 0 && spritePixel == 0) {
+            // Both transparent: Background color (Palette 0, Index 0)
+            finalPixel = 0;
+            finalPalette = 0;
+        } else if (bgPixel == 0 && spritePixel > 0) {
+            // Only sprite
+            finalPixel = spritePixel;
+            finalPalette = spritePalette;
+        } else if (bgPixel > 0 && spritePixel == 0) {
+            // Only background
+            finalPixel = bgPixel;
+            finalPalette = bgPalette;
+        } else {
+            // Both opaque
+            if (spritePriority) {
+                // Sprite is behind background
+                finalPixel = bgPixel;
+                finalPalette = bgPalette;
+            } else {
+                // Sprite is in front
+                finalPixel = spritePixel;
+                finalPalette = spritePalette;
+            }
+            
+            // Sprite 0 Hit Detection
+            if (spriteZeroBeingRendered && (ppuMask & 0x18) == 0x18) {
+                // Both BG and Sprite enabled
+                // Both pixels opaque
+                // Cycle != 255 (right edge clipping, usually ignored for simplicity)
+                // We are at the right cycle.
+                if (scanline != 261) { // Not in pre-render
+                     // Check left clipping
+                     if (!((ppuMask & 0x06) != 0x06 && cycle <= 8)) {
+                         if (bgPixel != 0) { // Check if background is opaque
+                             ppuStatus |= 0x40; // Set Sprite 0 Hit
+                         }
+                     }
+                }
+            }
+        }
+        
+        // 4. Color Output
+        int colorIndex = ppuRead(0x3F00 + (finalPalette << 2) + finalPixel) & 0x3F;
+        frameBuffer[scanline * 256 + (cycle - 1)] = NES_PALETTE[colorIndex];
+    }
+    
+    /**
      * Advance PPU by one cycle
      */
     public void clock() {
@@ -388,15 +645,50 @@ public class Ppu {
                 }
             }
             if (cycle == 256) incrementScrollY();
-            if (cycle == 257 && (ppuMask & 0x18) != 0) vramAddr = (vramAddr & 0xFBE0) | (tempVramAddr & 0x041F);
-            if (scanline == 261 && cycle >= 280 && cycle <= 304 && (ppuMask & 0x18) != 0) vramAddr = (vramAddr & 0x841F) | (tempVramAddr & 0x7BE0);
-            if (scanline < 240 && cycle >= 1 && cycle <= 256) renderPixel();
+            if (cycle == 257) {
+                loadBackgroundShifters();
+                incrementScrollY();
+                if ((ppuMask & 0x18) != 0) {
+                    vramAddr = (vramAddr & 0xFBE0) | (tempVramAddr & 0x041F);
+                }
+                
+                // Evaluate sprites for NEXT scanline
+                if (scanline < 240) {
+                    evaluateSprites();
+                } else {
+                    spriteCount = 0;
+                }
+            }
+            
+            // Fetch sprite patterns at end of scanline
+            if (cycle == 320) {
+                if (scanline < 240) {
+                    fetchSpritePatterns();
+                }
+            }
+            
+            if (scanline == 261 && cycle >= 280 && cycle <= 304 && (ppuMask & 0x18) != 0) {
+                vramAddr = (vramAddr & 0x841F) | (tempVramAddr & 0x7BE0);
+            }
+            
+            if (scanline < 240 && cycle >= 1 && cycle <= 256) {
+                renderPixel();
+            }
         }
+        
         if (scanline == 241 && cycle == 1) {
             ppuStatus |= 0x80;
             if (nmiOutput && bus != null) bus.nmi();
         }
-        if (scanline == 261 && cycle == 1) ppuStatus &= ~0xE0;
+        
+        if (scanline == 261 && cycle == 1) {
+            ppuStatus &= ~0xE0; // Clear VBlank, Sprite 0, Overflow
+            for (int i = 0; i < 8; i++) {
+                spriteShifterPatternLo[i] = 0;
+                spriteShifterPatternHi[i] = 0;
+            }
+        }
+        
         cycle++;
         if (cycle >= 341) {
             cycle = 0;
@@ -423,39 +715,7 @@ public class Ppu {
         return NES_PALETTE[colorIndex];
     }
     
-    /**
-     * Render a single pixel to the frame buffer
-     */
-    private void renderPixel() {
-        int x = cycle - 1;
-        int y = scanline;
-        
-        if (x < 0 || x >= 256 || y < 0 || y >= 240) {
-            return;
-        }
-        
-        // Background pixel
-        int bgPixel = 0;
-        int bgPalette = 0;
-        
-        if ((ppuMask & 0x08) != 0) { // Show background
-            int bitMux = 0x8000 >> fineX;
-            
-            int p0Pixel = (bgShifterPatternLo & bitMux) > 0 ? 1 : 0;
-            int p1Pixel = (bgShifterPatternHi & bitMux) > 0 ? 1 : 0;
-            bgPixel = (p1Pixel << 1) | p0Pixel;
-            
-            int bgPal0 = (bgShifterAttribLo & bitMux) > 0 ? 1 : 0;
-            int bgPal1 = (bgShifterAttribHi & bitMux) > 0 ? 1 : 0;
-            bgPalette = (bgPal1 << 1) | bgPal0;
-        }
-        
-        // Get final color
-        int color = getColorFromPalette(bgPalette, bgPixel);
-        
-        // Draw to frame buffer
-        frameBuffer[y * 256 + x] = color;
-    }
+
     
     /**
      * Load background shifters

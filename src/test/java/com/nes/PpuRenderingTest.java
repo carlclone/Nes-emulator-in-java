@@ -14,12 +14,20 @@ public class PpuRenderingTest {
     public void setUp() {
         bus = new Bus();
         ppu = bus.getPpu();
-        // bus.connectPpu(ppu); // Removed as Bus creates its own PPU
         
         // Create a dummy cartridge
         // 16KB PRG, 8KB CHR
         byte[] prg = new byte[16384];
         byte[] chr = new byte[8192];
+        
+        // Pre-fill CHR with Pattern Data for Tile 1 (Solid Color 1)
+        // Tile 1 starts at 0x0010
+        // Plane 0: 0x0010-0x0017 (All 1s)
+        // Plane 1: 0x0018-0x001F (All 0s)
+        for (int i = 0; i < 8; i++) {
+            chr[0x0010 + i] = (byte) 0xFF;
+        }
+        
         cartridge = new Cartridge(prg, chr, 0);
         
         ppu.connectCartridge(cartridge);
@@ -39,22 +47,8 @@ public class PpuRenderingTest {
         ppu.cpuWrite(0x2006, (byte) 0x00);
         ppu.cpuWrite(0x2007, (byte) 0x01); // Tile ID 0x01
         
-        // 3. Setup Pattern Table (Tile 0x01 is solid)
-        // Pattern table 0 is at 0x0000
-        // Tile 1 starts at 0x0010
-        // We need to write to CHR-RAM (if cartridge allows) or mock it.
-        // Since our Cartridge uses a byte array for CHR, we can write to it via PPU if it's treated as RAM or if we use a helper.
-        // But wait, standard Mapper 0 has CHR-ROM usually. Our Cartridge class might need checking.
-        // Let's assume for this test we can write to PPU address space 0x0000-0x1FFF if it's RAM, 
-        // OR we can just modify the cartridge array directly if we had access.
-        // Let's try writing via PPUADDR/DATA. If it fails (read-only), we'll know.
-        
-        // Write solid pattern for Tile 1
-        ppu.cpuWrite(0x2006, (byte) 0x00);
-        ppu.cpuWrite(0x2006, (byte) 0x10); // Address 0x0010
-        for (int i = 0; i < 8; i++) ppu.cpuWrite(0x2007, (byte) 0xFF); // Low plane all 1s
-        for (int i = 0; i < 8; i++) ppu.cpuWrite(0x2007, (byte) 0x00); // High plane all 0s
-        // Result: Color index 1
+        // 3. Pattern Table is already pre-filled in setUp()
+        // Tile 1 has 0xFF in low plane and 0x00 in high plane -> Color Index 1
         
         // 4. Enable Background Rendering
         // PPUCTRL: Background table 0 (0x0000)
@@ -62,11 +56,16 @@ public class PpuRenderingTest {
         // PPUMASK: Show background (Bit 3), Show background in left 8 pixels (Bit 1)
         ppu.cpuWrite(0x2001, (byte) 0x0A); 
         
-        // 5. Run PPU for one scanline
-        // Pre-render scanline (-1 or 261) -> Scanline 0
-        // We need to clock enough times to get past the pre-render and into visible scanline 0.
+        // 5. Run PPU to prime the shifters
+        // The PPU needs the pre-render scanline (261) to fetch the first tiles for scanline 0.
+        // Since reset() sets scanline=0, we should run a full frame or at least get to the end of the pre-render line.
         
-        // Advance to Scanline 0, Cycle 0
+        // Run until we hit the pre-render scanline
+        while (ppu.getScanline() != 261) {
+            ppu.clock();
+        }
+        
+        // Now run through the pre-render scanline until we hit scanline 0 again
         while (ppu.getScanline() != 0) {
             ppu.clock();
         }

@@ -12,17 +12,17 @@ A Nintendo Entertainment System (NES) emulator written in Java, featuring a full
   - Proper status flag handling
   
 - **PPU (Picture Processing Unit)**
-  - ✅ All 8 PPU registers (PPUCTRL, PPUMASK, PPUSTATUS, etc.)
-  - ✅ Background rendering with tile fetching
-  - ✅ NES 64-color palette
-  - ✅ Scrolling support
-  - ✅ VBlank and NMI generation
-  - ✅ Frame buffer (256x240 pixels)
+  -  All 8 PPU registers (PPUCTRL, PPUMASK, PPUSTATUS, etc.)
+  -  Background rendering with tile fetching
+  -  NES 64-color palette
+  -  Scrolling support
+  -  VBlank and NMI generation
+  -  Frame buffer (256x240 pixels)
   
 - **Display Window**
-  - ✅ Java Swing GUI (768x720, 3x scale)
-  - ✅ 60 FPS rendering
-  - ✅ Real-time graphics display
+  -  Java Swing GUI (768x720, 3x scale)
+  -  60 FPS rendering
+  -  Real-time graphics display
   
 - **Memory System**
   - 2KB RAM with mirroring
