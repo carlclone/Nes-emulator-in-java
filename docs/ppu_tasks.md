@@ -22,61 +22,61 @@
     - [x] VBlank generation
 
 ## Phase 2: Background Rendering
-- [ ] Tile Fetching
-    - [ ] Nametable byte fetch
-    - [ ] Attribute byte fetch
-    - [ ] Pattern table tile fetch (low/high)
-- [ ] Background Rendering Pipeline
-    - [ ] Shift registers for tile data
-    - [ ] Palette selection
-    - [ ] Pixel rendering
-- [ ] Scrolling
-    - [ ] Horizontal scroll
-    - [ ] Vertical scroll
-    - [ ] Nametable mirroring
+- [x] Tile Fetching
+    - [x] Nametable byte fetch
+    - [x] Attribute byte fetch
+    - [x] Pattern table tile fetch (low/high)
+- [x] Background Rendering Pipeline
+    - [x] Shift registers for tile data
+    - [x] Palette selection
+    - [x] Pixel rendering
+- [x] Scrolling
+    - [x] Horizontal scroll
+    - [x] Vertical scroll
+    - [x] Nametable mirroring
 
 ## Phase 3: Sprite Rendering
-- [ ] Sprite Evaluation
-    - [ ] Find sprites on current scanline
-    - [ ] Sprite 0 hit detection
-- [ ] Sprite Rendering
-    - [ ] 8x8 sprite rendering
-    - [ ] 8x16 sprite rendering (optional)
-    - [ ] Sprite priority
-    - [ ] Sprite flipping (H/V)
+- [x] Sprite Evaluation
+    - [x] Find sprites on current scanline
+    - [x] Sprite 0 hit detection
+- [x] Sprite Rendering
+    - [x] 8x8 sprite rendering
+    - [x] 8x16 sprite rendering (optional)
+    - [x] Sprite priority
+    - [x] Sprite flipping (H/V)
 
 ## Phase 4: Display Window
-- [ ] GUI Framework Setup
-    - [ ] Choose framework (Swing/JavaFX)
-    - [ ] Create window (256x240)
-    - [ ] Frame buffer implementation
-- [ ] Rendering Loop
-    - [ ] 60 FPS timing
-    - [ ] Frame buffer to screen
-    - [ ] Double buffering
+- [x] GUI Framework Setup
+    - [x] Choose framework (Swing/JavaFX)
+    - [x] Create window (256x240)
+    - [x] Frame buffer implementation
+- [x] Rendering Loop
+    - [x] 60 FPS timing
+    - [x] Frame buffer to screen
+    - [x] Double buffering
 
 ## Phase 5: Controller Input
-- [ ] Controller Registers
-    - [ ] 0x4016 (Controller 1)
-    - [ ] 0x4017 (Controller 2)
-- [ ] Input Mapping
-    - [ ] Keyboard to NES buttons
-    - [ ] Button state tracking
-- [ ] Input Polling
-    - [ ] Strobe mechanism
-    - [ ] Serial read
+- [x] Controller Registers
+    - [x] 0x4016 (Controller 1)
+    - [x] 0x4017 (Controller 2)
+- [x] Input Mapping
+    - [x] Keyboard to NES buttons
+    - [x] Button state tracking
+- [x] Input Polling
+    - [x] Strobe mechanism
+    - [x] Serial read
 
 ## Phase 6: Integration & Testing
-- [ ] PPU-CPU Synchronization
-    - [ ] Proper timing (3 PPU cycles per CPU cycle)
-    - [ ] NMI on VBlank
-- [ ] Complete Opcode Table
-    - [ ] Add remaining official opcodes
-    - [ ] Test with real games
-- [ ] Game Testing
-    - [ ] Test with simple games (e.g., Donkey Kong)
-    - [ ] Debug rendering issues
-    - [ ] Performance optimization
+- [x] PPU-CPU Synchronization
+    - [x] Proper timing (3 PPU cycles per CPU cycle)
+    - [x] NMI on VBlank
+- [x] Complete Opcode Table
+    - [x] Add remaining official opcodes
+    - [x] Test with real games
+- [x] Game Testing
+    - [x] Test with simple games (e.g., Donkey Kong)
+    - [x] Debug rendering issues
+    - [x] Performance optimization
 
 ## Phase 7: Polish & Features
 - [ ] APU (Audio) - Optional
