@@ -26,12 +26,12 @@ public class ShiftRotateTest {
     @Test
     public void testASL_Acc() {
         cpu.a = 0x01;
-        cpu.ASL_Acc();
+        cpu.ASL_Acc(0);
         assertEquals(0x02, cpu.a);
         assertEquals(0, cpu.getFlag(Cpu.C));
         
         cpu.a = (byte) 0x80;
-        cpu.ASL_Acc();
+        cpu.ASL_Acc(0);
         assertEquals(0x00, cpu.a);
         assertEquals(1, cpu.getFlag(Cpu.C));
         assertEquals(1, cpu.getFlag(Cpu.Z));
@@ -56,14 +56,14 @@ public class ShiftRotateTest {
         cpu.status |= Cpu.C; // Carry = 1
         cpu.a = 0x01;
         
-        cpu.ROL_Acc();
+        cpu.ROL_Acc(0);
         // (0x01 << 1) | 1 = 0x02 | 1 = 0x03
         assertEquals(0x03, cpu.a);
         assertEquals(0, cpu.getFlag(Cpu.C));
         
         cpu.a = (byte) 0x80;
         cpu.status &= ~Cpu.C; // Carry = 0
-        cpu.ROL_Acc();
+        cpu.ROL_Acc(0);
         // (0x80 << 1) | 0 = 0x00
         // Carry should be 1 (bit 7 was 1)
         assertEquals(0x00, cpu.a);

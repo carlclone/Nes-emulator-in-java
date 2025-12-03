@@ -42,6 +42,53 @@ public class EmulatorWindow extends JFrame {
         
         // Create timer for 60 FPS rendering (~16.67ms per frame)
         renderTimer = new Timer(16, e -> updateFrame());
+        
+        // Add Key Listener for Controller Input
+        addKeyListener(new java.awt.event.KeyAdapter() {
+            @Override
+            public void keyPressed(java.awt.event.KeyEvent e) {
+                handleInput(e.getKeyCode(), true);
+            }
+
+            @Override
+            public void keyReleased(java.awt.event.KeyEvent e) {
+                handleInput(e.getKeyCode(), false);
+            }
+        });
+        
+        setFocusable(true);
+        requestFocusInWindow();
+    }
+    
+    private void handleInput(int keyCode, boolean pressed) {
+        Controller controller = bus.getController(0); // Player 1
+        
+        switch (keyCode) {
+            case java.awt.event.KeyEvent.VK_X:
+                controller.setButtonPressed(Controller.BUTTON_A, pressed);
+                break;
+            case java.awt.event.KeyEvent.VK_Z:
+                controller.setButtonPressed(Controller.BUTTON_B, pressed);
+                break;
+            case java.awt.event.KeyEvent.VK_A:
+                controller.setButtonPressed(Controller.BUTTON_SELECT, pressed);
+                break;
+            case java.awt.event.KeyEvent.VK_S:
+                controller.setButtonPressed(Controller.BUTTON_START, pressed);
+                break;
+            case java.awt.event.KeyEvent.VK_UP:
+                controller.setButtonPressed(Controller.BUTTON_UP, pressed);
+                break;
+            case java.awt.event.KeyEvent.VK_DOWN:
+                controller.setButtonPressed(Controller.BUTTON_DOWN, pressed);
+                break;
+            case java.awt.event.KeyEvent.VK_LEFT:
+                controller.setButtonPressed(Controller.BUTTON_LEFT, pressed);
+                break;
+            case java.awt.event.KeyEvent.VK_RIGHT:
+                controller.setButtonPressed(Controller.BUTTON_RIGHT, pressed);
+                break;
+        }
     }
     
     /**

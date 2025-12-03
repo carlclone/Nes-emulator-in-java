@@ -17,6 +17,9 @@ public class Bus {
     private Ppu ppu = new Ppu();
     private Apu apu = new Apu();
     
+    // Controllers
+    private Controller[] controllers = new Controller[2];
+    
     private long systemClockCounter = 0;
 
     public Bus() {
@@ -24,6 +27,10 @@ public class Bus {
         for (int i = 0; i < ram.length; i++) {
             ram[i] = 0;
         }
+        
+        // Initialize Controllers
+        controllers[0] = new Controller();
+        controllers[1] = new Controller();
     }
     
     public void connectCpu(Cpu cpu) {
@@ -39,6 +46,7 @@ public class Bus {
     public void reset() {
         if (cpu != null) cpu.reset();
         ppu.reset();
+        systemClockCounter = 0;
     }
     
     public void nmi() {
@@ -86,6 +94,16 @@ public class Bus {
             return ppu.cpuRead(addr & 0x2007);
         }
         
+        // Controller 1 (0x4016)
+        if (addr == 0x4016) {
+            return controllers[0].cpuRead();
+        }
+        
+        // Controller 2 (0x4017)
+        if (addr == 0x4017) {
+            return controllers[1].cpuRead();
+        }
+        
         // APU Registers (0x4000 - 0x4017)
         if (addr >= 0x4000 && addr <= 0x4017) {
             return apu.cpuRead(addr);
@@ -123,6 +141,14 @@ public class Bus {
             return;
         }
         
+        // Controller Strobe (0x4016)
+        // Writing to 0x4016 affects BOTH controllers
+        if (addr == 0x4016) {
+            controllers[0].cpuWrite(data);
+            controllers[1].cpuWrite(data);
+            return;
+        }
+        
         // APU Registers (0x4000 - 0x4017)
         if (addr >= 0x4000 && addr <= 0x4017) {
             apu.cpuWrite(addr, data);
@@ -136,5 +162,9 @@ public class Bus {
     
     public Ppu getPpu() {
         return ppu;
+    }
+    
+    public Controller getController(int index) {
+        return controllers[index];
     }
 }

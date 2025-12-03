@@ -41,10 +41,14 @@ A Nintendo Entertainment System (NES) emulator written in Java, featuring a full
   - Integration tests
   - Real program execution validation
 
+- **Controller Input**
+  - Standard NES Controller (8 buttons)
+  - Keyboard mapping support
+  - Strobe and serial read implementation
+
 ### 🚧 Future Enhancements
 - APU (Audio Processing Unit) - Sound synthesis
 - Additional mappers (MMC1, MMC3, etc.)
-- Controller input
 - Save states
 
 ## Getting Started
@@ -80,6 +84,19 @@ mvn exec:java -Dexec.mainClass="com.nes.Main" -Dexec.args="path/to/game.nes"
 ```bash
 mvn exec:java -Dexec.mainClass="com.nes.Main" -Dexec.args="C:\Users\lin\Downloads\90tank.nes"
 ```
+
+## Controls
+
+| NES Button | Keyboard Key |
+|------------|--------------|
+| **D-Pad Up** | `Up Arrow` |
+| **D-Pad Down** | `Down Arrow` |
+| **D-Pad Left** | `Left Arrow` |
+| **D-Pad Right** | `Right Arrow` |
+| **A** | `X` |
+| **B** | `Z` |
+| **Select** | `A` |
+| **Start** | `S` |
 
 ## What You'll See
 
