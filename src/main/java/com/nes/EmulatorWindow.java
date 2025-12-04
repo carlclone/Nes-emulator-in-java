@@ -40,8 +40,7 @@ public class EmulatorWindow extends JFrame {
         pack();
         setLocationRelativeTo(null); // Center on screen
         
-        // Create timer for 60 FPS rendering (~16.67ms per frame)
-        renderTimer = new Timer(16, e -> updateFrame());
+        // Timer removed - rendering is now driven by the main emulation loop
         
         // Add Key Listener for Controller Input
         addKeyListener(new java.awt.event.KeyAdapter() {
@@ -96,7 +95,6 @@ public class EmulatorWindow extends JFrame {
      */
     public void start() {
         running = true;
-        renderTimer.start();
         setVisible(true);
     }
     
@@ -105,13 +103,13 @@ public class EmulatorWindow extends JFrame {
      */
     public void stop() {
         running = false;
-        renderTimer.stop();
     }
     
     /**
-     * Update frame buffer from PPU and repaint
+     * Update frame buffer from PPU and repaint.
+     * Called synchronously from the emulation loop.
      */
-    private void updateFrame() {
+    public void renderFrame() {
         if (!running) return;
         
         // Get frame buffer from PPU

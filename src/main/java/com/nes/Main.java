@@ -57,6 +57,9 @@ public class Main {
                         bus.clock();
                     }
                     
+                    // Render the frame immediately after emulation
+                    window.renderFrame();
+                    
                     // Debug Output every 60 frames
                     if (bus.getPpu().getFrame() % 60 == 0) {
                         Ppu ppu = bus.getPpu();
