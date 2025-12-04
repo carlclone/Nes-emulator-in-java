@@ -141,6 +141,28 @@ public class Bus {
             return;
         }
         
+        // OAM DMA (0x4014)
+        if (addr == 0x4014) {
+            // DMA Transfer
+            // CPU writes the high byte of the RAM address (XX00)
+            int page = (data & 0xFF) << 8;
+            
+            // Transfer 256 bytes
+            for (int i = 0; i < 256; i++) {
+                // Read from CPU RAM
+                // Note: We use the internal read method or direct array access if possible,
+                // but read() handles mirroring which is safer.
+                byte b = read(page + i);
+                
+                // Write to PPU OAMDATA (0x2004)
+                ppu.cpuWrite(0x2004, b);
+            }
+            
+            // TODO: CPU suspension (513/514 cycles)
+            // For now, we just do the transfer instantly.
+            return;
+        }
+
         // Controller Strobe (0x4016)
         // Writing to 0x4016 affects BOTH controllers
         if (addr == 0x4016) {
