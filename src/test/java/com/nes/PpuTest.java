@@ -276,4 +276,68 @@ public class PpuTest {
         ppu.cpuRead(0x2007); // Buffer load
         assertEquals((byte)0x22, ppu.cpuRead(0x2007));
     }
+
+    @Test
+    public void testNametableMirroring() {
+        // 1. Horizontal Mirroring (Default in setUp)
+        // NT0 (0x2000) == NT1 (0x2400)
+        // NT2 (0x2800) == NT3 (0x2C00)
+        
+        ppu.cpuWrite(0x2000, (byte) 0x00);
+        
+        // Write to 0x2000
+        ppu.cpuWrite(0x2006, (byte) 0x20);
+        ppu.cpuWrite(0x2006, (byte) 0x00);
+        ppu.cpuWrite(0x2007, (byte) 0xAA);
+        
+        // Read from 0x2400 (Should match 0x2000)
+        ppu.cpuWrite(0x2006, (byte) 0x24);
+        ppu.cpuWrite(0x2006, (byte) 0x00);
+        ppu.cpuRead(0x2007); // Buffer
+        assertEquals((byte)0xAA, ppu.cpuRead(0x2007));
+        
+        // Write to 0x2800
+        ppu.cpuWrite(0x2006, (byte) 0x28);
+        ppu.cpuWrite(0x2006, (byte) 0x00);
+        ppu.cpuWrite(0x2007, (byte) 0xBB);
+        
+        // Read from 0x2C00 (Should match 0x2800)
+        ppu.cpuWrite(0x2006, (byte) 0x2C);
+        ppu.cpuWrite(0x2006, (byte) 0x00);
+        ppu.cpuRead(0x2007); // Buffer
+        assertEquals((byte)0xBB, ppu.cpuRead(0x2007));
+        
+        // 2. Vertical Mirroring
+        // Create new cartridge with Vertical Mirroring (Mode 1)
+        byte[] prg = new byte[16384];
+        byte[] chr = new byte[8192];
+        Cartridge vCart = new Cartridge(prg, chr, 0, 1); // Mode 1 = Vertical
+        ppu.connectCartridge(vCart);
+        ppu.reset();
+        
+        // NT0 (0x2000) == NT2 (0x2800)
+        // NT1 (0x2400) == NT3 (0x2C00)
+        
+        // Write to 0x2000
+        ppu.cpuWrite(0x2006, (byte) 0x20);
+        ppu.cpuWrite(0x2006, (byte) 0x00);
+        ppu.cpuWrite(0x2007, (byte) 0xCC);
+        
+        // Read from 0x2800 (Should match 0x2000)
+        ppu.cpuWrite(0x2006, (byte) 0x28);
+        ppu.cpuWrite(0x2006, (byte) 0x00);
+        ppu.cpuRead(0x2007); // Buffer
+        assertEquals((byte)0xCC, ppu.cpuRead(0x2007));
+        
+        // Write to 0x2400
+        ppu.cpuWrite(0x2006, (byte) 0x24);
+        ppu.cpuWrite(0x2006, (byte) 0x00);
+        ppu.cpuWrite(0x2007, (byte) 0xDD);
+        
+        // Read from 0x2C00 (Should match 0x2400)
+        ppu.cpuWrite(0x2006, (byte) 0x2C);
+        ppu.cpuWrite(0x2006, (byte) 0x00);
+        ppu.cpuRead(0x2007); // Buffer
+        assertEquals((byte)0xDD, ppu.cpuRead(0x2007));
+    }
 }
