@@ -240,4 +240,40 @@ public class PpuTest {
             fail("Reflection failed: " + e.getMessage());
         }
     }
+
+    @Test
+    public void testVRAMIncrement() {
+        ppu.reset();
+        
+        // Mode 0: Increment by 1
+        ppu.cpuWrite(0x2000, (byte) 0x00); // PPUCTRL = 0
+        ppu.cpuWrite(0x2006, (byte) 0x20); // Address 0x2000
+        ppu.cpuWrite(0x2006, (byte) 0x00);
+        
+        ppu.cpuWrite(0x2007, (byte) 0xFF); // Write data at 0x2000
+        ppu.cpuWrite(0x2007, (byte) 0xAA); // Write data at 0x2001
+        
+        // Read back
+        ppu.cpuWrite(0x2006, (byte) 0x20); // Address 0x2000
+        ppu.cpuWrite(0x2006, (byte) 0x00);
+        ppu.cpuRead(0x2007); // Buffer load (0xFF)
+        assertEquals((byte)0xFF, ppu.cpuRead(0x2007)); // Read 0xFF, Buffer load (0xAA)
+        assertEquals((byte)0xAA, ppu.cpuRead(0x2007)); // Read 0xAA
+        
+        // Mode 1: Increment by 32
+        ppu.cpuWrite(0x2000, (byte) 0x04); // PPUCTRL bit 2 set
+        ppu.cpuWrite(0x2006, (byte) 0x20); // Address 0x2000
+        ppu.cpuWrite(0x2006, (byte) 0x00);
+        
+        ppu.cpuWrite(0x2007, (byte) 0x11); // Write at 0x2000, addr becomes 0x2020
+        
+        // Verify we are at 0x2020 by writing something else there
+        ppu.cpuWrite(0x2007, (byte) 0x22); // Write at 0x2020
+        
+        // Read back 0x2020
+        ppu.cpuWrite(0x2006, (byte) 0x20);
+        ppu.cpuWrite(0x2006, (byte) 0x20);
+        ppu.cpuRead(0x2007); // Buffer load
+        assertEquals((byte)0x22, ppu.cpuRead(0x2007));
+    }
 }
