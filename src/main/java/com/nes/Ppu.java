@@ -431,10 +431,13 @@ public class Ppu {
             secondaryOam[i] = (byte) 0xFF;
         }
         
+        // Target scanline is the NEXT one
+        int targetScanline = (scanline == 261) ? 0 : scanline + 1;
+        
         // Sprite evaluation for next scanline
         int oamEntry = 0;
         while (oamEntry < 64 && spriteCount < 8) {
-            int diff = scanline - (oam[oamEntry * 4] & 0xFF);
+            int diff = targetScanline - (oam[oamEntry * 4] & 0xFF);
             
             // Check if sprite is visible on this scanline
             // Standard sprites are 8x8, so diff should be >= 0 and < 8
@@ -477,7 +480,8 @@ public class Ppu {
             int spriteHeight = (ppuCtrl & 0x20) != 0 ? 16 : 8;
             boolean flipV = (spriteAttrib & 0x80) != 0;
             
-            int row = scanline - spriteY;
+            int targetScanline = (scanline == 261) ? 0 : scanline + 1;
+            int row = targetScanline - spriteY;
             if (flipV) {
                 row = (spriteHeight - 1) - row;
             }
@@ -665,7 +669,7 @@ public class Ppu {
                 }
                 
                 // Evaluate sprites for NEXT scanline
-                if (scanline < 240) {
+                if (scanline < 240 || scanline == 261) {
                     evaluateSprites();
                 } else {
                     spriteCount = 0;
@@ -674,7 +678,7 @@ public class Ppu {
             
             // Fetch sprite patterns at end of scanline
             if (cycle == 320) {
-                if (scanline < 240) {
+                if (scanline < 240 || scanline == 261) {
                     fetchSpritePatterns();
                 }
             }

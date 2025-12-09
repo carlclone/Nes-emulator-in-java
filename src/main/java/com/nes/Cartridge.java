@@ -71,6 +71,16 @@ public class Cartridge {
     public Cartridge(byte[] prgRom, byte[] chrRom, int mapperId) {
         this(prgRom, chrRom, mapperId, 0);
     }
+    
+    // Test constructor with explicit banks
+    public Cartridge(byte[] prgRom, byte[] chrRom, int mapperId, int mirrorMode, int prgBanks, int chrBanks) {
+        this.prgRom = prgRom;
+        this.chrRom = chrRom;
+        this.mapperId = mapperId;
+        this.mirrorMode = mirrorMode;
+        this.prgBanks = prgBanks;
+        this.chrBanks = chrBanks;
+    }
 
     public int getPrgBanks() { return prgBanks; }
     public int getChrBanks() { return chrBanks; }

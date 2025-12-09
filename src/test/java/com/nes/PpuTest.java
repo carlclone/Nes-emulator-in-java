@@ -21,7 +21,12 @@ public class PpuTest {
         cart = new Cartridge(prg, chr, 0);
         
         bus = new Bus();
-        ppu = new Ppu();
+        ppu = bus.getPpu();
+        // ppu.connectBus(bus); // Bus already connected to PPU internally? 
+        // Bus.java:38: ppu.connectBus(this); is called in connectCpu.
+        // But we don't call connectCpu in test.
+        // Let's check Bus constructor. It doesn't connect bus to PPU.
+        // We need to ensure PPU has reference to Bus.
         ppu.connectBus(bus);
         ppu.connectCartridge(cart);
         ppu.reset();
@@ -339,5 +344,218 @@ public class PpuTest {
         ppu.cpuWrite(0x2006, (byte) 0x00);
         ppu.cpuRead(0x2007); // Buffer
         assertEquals((byte)0xDD, ppu.cpuRead(0x2007));
+    }
+
+    @Test
+    public void testSpriteZeroHit() {
+        // Create Cartridge with CHR-RAM (chrBanks = 0)
+        byte[] prg = new byte[16384];
+        byte[] chr = new byte[8192]; // 8KB RAM
+        // prgBanks=1, chrBanks=0 (RAM)
+        Cartridge ramCart = new Cartridge(prg, chr, 0, 0, 1, 0);
+        
+        ppu.connectCartridge(ramCart);
+        ppu.reset();
+        
+        // 1. Setup OAM for Sprite 0
+        // Y = 10, Tile = 1, Attr = 0, X = 10
+        ppu.cpuWrite(0x2003, (byte) 0x00);
+        ppu.cpuWrite(0x2004, (byte) 10);
+        ppu.cpuWrite(0x2004, (byte) 1);
+        ppu.cpuWrite(0x2004, (byte) 0);
+        ppu.cpuWrite(0x2004, (byte) 10);
+        
+        // 2. Setup Pattern Table (CHR-RAM)
+        // We need Sprite 0 (Tile 1) to be opaque at the hit point.
+        // And Background (Tile 0 by default) to be opaque.
+        
+        // Set PPUADDR to 0x0010 (Tile 1, Plane 0)
+        ppu.cpuWrite(0x2006, (byte) 0x00);
+        ppu.cpuWrite(0x2006, (byte) 0x10);
+        // Write 0xFF (Solid line)
+        for (int i = 0; i < 8; i++) ppu.cpuWrite(0x2007, (byte) 0xFF);
+        
+        // Set PPUADDR to 0x1000 (Background Tile 0, Plane 0) - Assuming BG uses table 1 (0x1000)
+        // Let's configure PPUCTRL to use Table 1 for BG and Table 0 for Sprites.
+        // PPUCTRL: 0x10 (Bit 4 = BG Table 1)
+        ppu.cpuWrite(0x2000, (byte) 0x10);
+        
+        ppu.cpuWrite(0x2006, (byte) 0x10);
+        ppu.cpuWrite(0x2006, (byte) 0x00);
+        for (int i = 0; i < 8; i++) ppu.cpuWrite(0x2007, (byte) 0xFF);
+        
+        // 3. Setup Nametable
+        // We need Tile 0 at (0,0) in Nametable (0x2000).
+        // It's 0 by default, but let's be sure.
+        ppu.cpuWrite(0x2006, (byte) 0x20);
+        ppu.cpuWrite(0x2006, (byte) 0x00);
+        ppu.cpuWrite(0x2007, (byte) 0x00);
+        
+        // 4. Enable Rendering
+        // PPUMASK: 0x1E (Show BG, Show Sprites, No clipping)
+        ppu.cpuWrite(0x2001, (byte) 0x1E);
+        
+        // 5. Run until Scanline 10
+        // Each scanline is 341 cycles.
+        // We expect hit at Scanline 10, Cycle ~10.
+        
+        // Run 9 full scanlines first
+        for (int i = 0; i < 9 * 341; i++) ppu.clock();
+        
+        // Now in Scanline 9 (0-indexed? No, scanline 0 is first).
+        // So we just finished scanline 8.
+        // Let's run scanline 9.
+        for (int i = 0; i < 341; i++) ppu.clock();
+        
+        // Now at Scanline 10.
+        // Check Status - Should be 0 initially
+        assertEquals(0, (ppu.cpuRead(0x2002) & 0x40));
+        
+        // Run to Cycle 10 (approx)
+        for (int i = 0; i < 15; i++) ppu.clock();
+        
+        // Check Status - Should be 1 (Hit!)
+        // Note: Exact cycle depends on pipeline latency, usually +2 or +3 pixels.
+        // Sprite X=10 means pixel 10.
+        assertEquals(0x40, (ppu.cpuRead(0x2002) & 0x40), "Sprite 0 Hit should be set");
+    }
+
+    @Test
+    public void testScrollReset() {
+        ppu.reset();
+        
+        // Set Scroll: X=0, Y=0
+        // Write to PPUCTRL to set Base Nametable = 0
+        ppu.cpuWrite(0x2000, (byte) 0x00);
+        
+        // Write to PPUSCROLL: X=0, Y=0
+        ppu.cpuWrite(0x2005, (byte) 0x00);
+        ppu.cpuWrite(0x2005, (byte) 0x00);
+        
+        // Enable Rendering
+        ppu.cpuWrite(0x2001, (byte) 0x1E);
+        
+        // Run one full frame
+        for (int i = 0; i < 262 * 341; i++) ppu.clock();
+        
+        // Verify VRAM Address is reset to 0 (or close to it) at start of next frame
+        // Actually, at Scanline 0, Cycle 0, vramAddr should be equal to tempVramAddr (0).
+        
+        try {
+            java.lang.reflect.Field vramAddrField = Ppu.class.getDeclaredField("vramAddr");
+            vramAddrField.setAccessible(true);
+            int vramAddr = (int) vramAddrField.get(ppu);
+            
+            // It should be 0x0002 (Coarse X = 2) due to prefetch cycles (321-336) on pre-render line
+            assertEquals(0x0002, vramAddr & 0x7FFF);
+            
+            // Now set a scroll and verify it resets correctly
+            // Set Scroll: X=0, Y=120 (Middle of screen)
+            // Y=120 -> Coarse Y = 15 (0x0F), Fine Y = 0
+            // PPUSCROLL writes:
+            // 1. X=0
+            // 2. Y=120
+            
+            // We need to write to PPUADDR/SCROLL during VBlank or Pre-render to set t.
+            // Let's reset and set t manually via registers.
+            ppu.reset();
+            ppu.cpuWrite(0x2000, (byte) 0x00);
+            ppu.cpuWrite(0x2005, (byte) 0x00); // X=0
+            ppu.cpuWrite(0x2005, (byte) 120);  // Y=120
+            
+            // Enable Rendering
+            ppu.cpuWrite(0x2001, (byte) 0x1E);
+            
+            // Run until Pre-render line (261), Cycle 304 (End of vertical copy)
+            // 261 * 341 + 304
+            int cyclesToCopy = 261 * 341 + 304;
+            for (int i = 0; i < cyclesToCopy; i++) ppu.clock();
+            
+            // Check vramAddr
+            // Y=120 -> Coarse Y=15 (001111), Fine Y=0
+            // vramAddr should have these bits set.
+            // Coarse Y is bits 5-9. 15 << 5 = 480 (0x1E0)
+            vramAddr = (int) vramAddrField.get(ppu);
+            
+            assertEquals(0x01E0, vramAddr & 0x7FFF, "VRAM Address should have Y scroll applied at start of frame");
+            
+        } catch (Exception e) {
+            fail("Reflection failed: " + e.getMessage());
+        }
+        }
+
+
+    @Test
+    public void testCoarseXReset() {
+        ppu.reset();
+        
+        // Setup a scroll position
+        // T: ...NN.. ...XXXXX
+        // Let's set Coarse X = 10 (0x0A) and Nametable = 1 (0x01)
+        // T = 0000 0100 0000 1010 = 0x040A
+        
+        // We can set T via PPUCTRL (Nametable) and PPUSCROLL (X/Y)
+        // PPUCTRL: Set NT=1 (Bit 0)
+        ppu.cpuWrite(0x2000, (byte) 0x01);
+        
+        // PPUSCROLL: X=80 (Coarse X=10, Fine X=0)
+        // First write to 2005 sets Coarse X and Fine X in T
+        ppu.cpuWrite(0x2005, (byte) 80);
+        ppu.cpuWrite(0x2005, (byte) 0); // Y=0
+        
+        // Enable Rendering
+        ppu.cpuWrite(0x2001, (byte) 0x1E);
+        
+        // Run to Cycle 256 of Scanline 0
+        // At this point, VRAM Addr (v) might have incremented Coarse X during rendering.
+        // But at Cycle 257, it MUST copy Coarse X and NT X from T.
+        
+        for (int i = 0; i <= 256; i++) ppu.clock();
+        
+        // Now at Cycle 257. The copy happens here.
+        ppu.clock();
+        
+        try {
+            java.lang.reflect.Field vramAddrField = Ppu.class.getDeclaredField("vramAddr");
+            vramAddrField.setAccessible(true);
+            int vramAddr = (int) vramAddrField.get(ppu);
+            
+            // Check Coarse X (Bits 0-4) and NT X (Bit 10)
+            // Should match T (0x040A)
+            // Note: Other bits (Y scroll) should also match T if we are at Scanline 0?
+            // Actually, vramAddr tracks Y scroll, so Y bits might be different if we were further down.
+            // But at Scanline 0, Y is 0.
+            
+            assertEquals(0x0A, vramAddr & 0x001F, "Coarse X should be reset to 10");
+            assertEquals(0x0400, vramAddr & 0x0400, "Nametable X should be reset to 1");
+            
+        } catch (Exception e) {
+            fail("Reflection failed: " + e.getMessage());
+        }
+        }
+
+
+    @Test
+    public void testOAMDMA() {
+        ppu.reset();
+        
+        // 1. Fill CPU RAM with known data
+        // DMA usually copies from 0xXX00. Let's use page 0x02 (0x0200-0x02FF)
+        // This is commonly used for OAM in games.
+        for (int i = 0; i < 256; i++) {
+            bus.write(0x0200 + i, (byte) (0xFF - i));
+        }
+        
+        // 2. Trigger DMA
+        // Write 0x02 to 0x4014
+        bus.write(0x4014, (byte) 0x02);
+        
+        // 3. Verify OAM data
+        for (int i = 0; i < 256; i++) {
+            // Set OAMADDR to i
+            ppu.cpuWrite(0x2003, (byte) i);
+            byte data = ppu.cpuRead(0x2004);
+            assertEquals((byte) (0xFF - i), data, "OAM byte " + i + " should match RAM");
+        }
     }
 }
