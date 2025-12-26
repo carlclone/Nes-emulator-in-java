@@ -11,3 +11,10 @@ cpu visual step test GUI
 cpu realtime visual trace GUI
 
 https://github.com/OneLoneCoder/olcNES
+
+https://zhuanlan.zhihu.com/p/651061425
+
+TBD  game compatibility list
+
+
+https://nescartdb.com/
